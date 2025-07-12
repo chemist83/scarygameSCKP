@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Granny Babylon.js Oyunu</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+    #renderCanvas { width: 100%; height: 100%; touch-action: none; }
+  </style>
+</head>
+<body>
+  <canvas id="renderCanvas"></canvas>
+  <script src="https://cdn.babylonjs.com/babylon.js"></script>
+  <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+  <script>
+    // Buraya sana verdiğim tüm birleşik JS kodunu yapıştır 👇
+    // TÜM BABYLON.JS GRANNY OYUNU - BÜTÜNLEŞMİŞ VERSİYON
+
+let canvas, engine, scene; let camera, granny; let joystickValue = { x: 0, y: 0 }; let inventoryItem = null; let advancedTexture, interactBtn, throwBtn, dropBtn, inventoryText; let playerPosition;
+
+window.addEventListener('DOMContentLoaded', () => { canvas = document.getElementById('renderCanvas'); engine = new BABYLON.Engine(canvas, true);
+
+scene = createScene();
+
+engine.runRenderLoop(() => { scene.render(); });
+
+window.addEventListener('resize', () => { engine.resize(); }); });
+
+function createScene() { const scene = new BABYLON.Scene(engine);
+
+camera = new BABYLON.UniversalCamera("camera", new BABYLON.Vector3(0, 2, -8), scene); camera.attachControl(canvas, true); camera.speed = 0.2;
+
+const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene); light.intensity = 0.8;
+
+// İlk oda: tek duvar const roomWidth = 10; const roomDepth = 8; const roomHeight = 4; const doorWidth = 2; const doorHeight = 3;
+
+const backWall = BABYLON.MeshBuilder.CreateBox("backWall", { width: roomWidth, height: roomHeight, depth: 0.1 }, scene); backWall.position = new BABYLON.Vector3(0, roomHeight / 2, roomDepth / 2); const wallMat = new BABYLON.StandardMaterial("wallMat", scene); wallMat.diffuseColor = new BABYLON.Color3(0.7, 0.7, 0.7); backWall.material = wallMat;
+
+// GRANNY granny = BABYLON.MeshBuilder.CreateBox("granny", { size: 1.5 }, scene); granny.position = new BABYLON.Vector3(5, 0.75, 5); const grannyMat = new BABYLON.StandardMaterial("grannyMat", scene); grannyMat.diffuseColor = new BABYLON.Color3(0.6, 0.4, 0.3); granny.material = grannyMat;
+
+// GUI advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+
+// JOYSTICK const joystickBase = new BABYLON.GUI.Ellipse(); joystickBase.width = "120px"; joystickBase.height = "120px"; joystickBase.color = "white"; joystickBase.thickness = 2; joystickBase.background = "rgba(255,255,255,0.3)"; joystickBase.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_LEFT; joystickBase.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM; joystickBase.left = "20px"; joystickBase.bottom = "20px"; advancedTexture.addControl(joystickBase);
+
+const joystickThumb = new BABYLON.GUI.Ellipse(); joystickThumb.width = "60px"; joystickThumb.height = "60px"; joystickThumb.color = "white"; joystickThumb.thickness = 2; joystickThumb.background = "rgba(255,255,255,0.7)"; joystickBase.addControl(joystickThumb);
+
+let joystickPointerId = null;
+
+joystickThumb.onPointerDownObservable.add((info) => { joystickPointerId = info.pointerId; }); joystickBase.onPointerUpObservable.add((info) => { if (info.pointerId === joystickPointerId) { joystickPointerId = null; joystickValue = { x: 0, y: 0 }; joystickThumb.left = "0px"; joystickThumb.top = "0px"; } }); joystickBase.onPointerMoveObservable.add((info) => { if (joystickPointerId === info.pointerId) { const pointerX = info.localX - joystickBase._currentMeasure.left - joystickBase.widthInPixels / 2; const pointerY = info.localY - joystickBase._currentMeasure.top - joystickBase.heightInPixels / 2;
+
+const maxDistance = joystickBase.widthInPixels / 2 - joystickThumb.widthInPixels / 2;
+  let x = pointerX;
+  let y = pointerY;
+
+  const dist = Math.sqrt(x * x + y * y);
+  if (dist > maxDistance) {
+    const ratio = maxDistance / dist;
+    x *= ratio;
+    y *= ratio;
+  }
+
+  joystickThumb.left = x + "px";
+  joystickThumb.top = y + "px";
+
+  joystickValue = { x: x / maxDistance, y: y / maxDistance };
+}
+
+});
+
+// BUTONLAR function createButton(text, left, bottom) { const btn = BABYLON.GUI.Button.CreateSimpleButton(text + "Btn", text); btn.width = "90px"; btn.height = "40px"; btn.color = "white"; btn.background = "rgba(0,0,0,0.5)"; btn.cornerRadius = 10; btn.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_RIGHT; btn.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_BOTTOM; btn.left = left; btn.bottom = bottom; advancedTexture.addControl(btn); return btn; }
+
+interactBtn = createButton("Interact", "120px", "20px"); throwBtn = createButton("Throw", "20px", "20px"); dropBtn = createButton("Drop", "-80px", "20px");
+
+// ETKİLEŞİM: Dummy obje const chest = BABYLON.MeshBuilder.CreateBox("chest", { width: 1, height: 1, depth: 1 }, scene); chest.position = new BABYLON.Vector3(2, 0.5, 2); chest.material = new BABYLON.StandardMaterial("chestMat", scene); chest.material.diffuseColor = new BABYLON.Color3(0.5, 0.3, 0.1); const interactableItems = [chest];
+
+function pickUpItem(item) { if (inventoryItem === null) { inventoryItem = item; item.isVisible = false; showInventoryIcon(item); } }
+
+function showInventoryIcon(item) { if (!inventoryText) { inventoryText = new BABYLON.GUI.TextBlock(); inventoryText.color = "white"; inventoryText.fontSize = 24; inventoryText.text = ""; inventoryText.horizontalAlignment = BABYLON.GUI.Control.HORIZONTAL_ALIGNMENT_CENTER; inventoryText.verticalAlignment = BABYLON.GUI.Control.VERTICAL_ALIGNMENT_TOP; advancedTexture.addControl(inventoryText); } inventoryText.text = "Inventory: " + item.name; }
+
+function throwItem() { if (inventoryItem) { const forward = camera.getDirection(BABYLON.Axis.Z); inventoryItem.position = camera.position.add(forward.scale(2)); inventoryItem.isVisible = true; inventoryItem = null; inventoryText.text = ""; } }
+
+function dropItem() { if (inventoryItem) { inventoryItem.position = camera.position.clone(); inventoryItem.isVisible = true; inventoryItem = null; inventoryText.text = ""; } }
+
+interactBtn.onPointerUpObservable.add(() => { interactableItems.forEach(item => { const dist = BABYLON.Vector3.Distance(item.position, camera.position); if (dist < 3 && item.isVisible) { pickUpItem(item); } }); }); throwBtn.onPointerUpObservable.add(() => throwItem()); dropBtn.onPointerUpObservable.add(() => dropItem());
+
+playerPosition = camera.position.clone();
+
+scene.registerBeforeRender(() => { if (joystickValue.x !== 0 || joystickValue.y !== 0) { const forward = camera.getDirection(BABYLON.Axis.Z); const right = camera.getDirection(BABYLON.Axis.X); let move = right.scale(joystickValue.x).add(forward.scale(joystickValue.y)); move.y = 0; camera.position.addInPlace(move.scale(camera.speed)); }
+
+moveGrannyTowardsPlayer(granny, playerPosition, scene);
+
+playerPosition = camera.position.clone();
+
+});
+
+return scene; }
+
+function moveGrannyTowardsPlayer(granny, playerPos, scene) { const direction = playerPos.subtract(granny.position); const distance = direction.length(); if (distance > 1) { direction.normalize(); granny.position.addInPlace(direction.scale(0.02)); } }
+
+
+  </script>
+</body>
+</html>
